@@ -31,7 +31,7 @@ void config_TIMER1(void);
 void main(void){
     config_GPIO();
     config_ADC();
-    config_TIMER0(); // timer 
+    config_TIMER0(); // timer que cuenta cada cuanto tomo el promedio
     config_TIMER1(); // tiempo que dura el riego
     while(1){};
 }
