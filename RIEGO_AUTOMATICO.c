@@ -9,6 +9,7 @@
                 - Venecia Milagros Ailín
  */
 
+
 //-------- HEADERS --------//
 #include "LPC17xx.h"
 #include "lpc17xx_dac.h"
@@ -26,35 +27,43 @@
 #define muestras_size 2000 //cantidad de muestras
 volatile uint16_t muestras[muestras_size]; //buffer de muestras
 
-uint16_t contador_muestras = 2000; // se va a restar uno cada vez que se complete una muestra
+volatile contador_muestras = 2000; // se va a restar uno cada vez que se complete una muestra
 
-uint16_t promedio = 0;
-
-
-
-char resultadoHum[]	=	" ";					// Para enviar por UART
+volatile promedio = 0;
 
 
-uint8_t RegHumDMA[1] = {0};						    // Para enviar por UART usando DMA
+
+//char resultadoHum[]	=	" ";					// Para enviar por UART
+
+
+//uint8_t RegHumDMA[1] = {0};						    // Para enviar por UART usando DMA
 
 //-------- FUNCIONES --------//
 void config_GPIO(void);
 void config_ADC(void);
 void config_TIMER0(void);
 void config_TIMER1(void);
-void config_DMA(void);
-void config_UART(void);
+//void config_DMA(void);
+//void config_UART(void);
 void visualizar_DMA_UART();
 
 //-------- PROGRAMA PRINCIPAL --------//
-void main(void){
+int main(void){
+    GPIO_ClearValue(0, 1<<0); //Apago Led azul pin 0.1
+    GPIO_ClearValue(0, 1<<1); //Apago Led azul pin 0.1
+    GPIO_ClearValue(0, 1<<2); //Apago Led azul pin 0.1
+    GPIO_ClearValue(0, 1<<3); //Apago Led azul pin 0.1
+    GPIO_ClearValue(0, 1<<23); //Apago Led azul pin 0.1
+    
     config_GPIO();
     config_ADC();
     config_TIMER0(); // timer que cuenta cada cuanto tomo el promedio
     config_TIMER1(); // tiempo que dura el riego
   
 
-    while(1){};
+    while(1){}
+
+    return 0;   
 }
 
 // Configuracion de los pines
@@ -92,19 +101,15 @@ void config_GPIO(){
 
     PINSEL_ConfigPin(&pinselConfig);
 
-    //Configuracion para pin - Uart tx y rx
+    /*//Configuracion para pin - Uart tx
 
     // TXD2
     pinselConfig.Portnum = 0; //port 0
     pinselConfig.Pinnum = 10; //pin 10
     pinselConfig.Funcnum = 1; //funcion tx/rx (igual para los 2 pines)
-
+    
 	
-	PINSEL_ConfigPin(&pinselConfig);
-
-    // RXD2
-	pinselConfig.Pinnum = 11; //pin 10
-	PINSEL_ConfigPin(&pinselConfig);
+	PINSEL_ConfigPin(&pinselConfig); */
 
     GPIO_SetDir(0, 1<<0, 1); //pin 0.0 como salida
 	GPIO_SetDir(0, 1<<1, 1); //pin 0.1 como salida
@@ -118,15 +123,17 @@ void config_GPIO(){
 // Configuracion del ADC
 void config_ADC(void){
     
-    ADC_Init(LPC_ADC, 200000);    // inicializa el ADC a 200kHz de frecuencia de muestreo
+    ADC_Init(LPC_ADC, 20000);    // inicializa el ADC a 200kHz de frecuencia de muestreo
     ADC_ChannelCmd(LPC_ADC, 0, ENABLE); // habilita el canal 0
     ADC_BurstCmd(LPC_ADC, DISABLE); // deshabilita el modo burst
     
-    ADC_IntConfig(LPC_ADC, ADC_ADINTEN0, ENABLE); // habilita la interrupcion del canal 0
-    NVIC_EnableIRQ(ADC_IRQn); // habilita la interrupcion del ADC
-    NVIC_SetPriority(ADC_IRQn, (9)); //LO DEFINIMOS BIEN DESPUES
+    ADC_IntConfig(LPC_ADC, ADC_ADINTEN0, ENABLE); // habilita la interrupcion del canal 
+    //NVIC_EnableIRQ(ADC_IRQn); // habilita la interrupcion del ADC
+    NVIC_SetPriority(ADC_IRQn, 2);
+    ADC_GlobalGetStatus(LPC_ADC, 1);					// Limpia la bandera del ADC
 
     ADC_StartCmd(LPC_ADC, ADC_START_NOW); //comienza la conversion
+    GPIO_SetValue(0, 1<<0); //Enciendo Led rojo
 
 }
 
@@ -153,8 +160,10 @@ void config_TIMER0(void){
     TIM_ResetCounter(LPC_TIM0);
     TIM_Cmd(LPC_TIM0, ENABLE); //inicia el timer
 
-    NVIC_SetPriority(TIMER0_IRQn, (8)); //REVISAR QUE VALOR VA
+    NVIC_SetPriority(TIMER0_IRQn, 1); 
     NVIC_EnableIRQ(TIMER0_IRQn);    
+    TIM_ClearIntPending(LPC_TIM0,TIM_MR0_INT); //Limpio bandera de interrupcion del timer0
+
 }
 
 //Configuracion TIMER 1 para que se encienda la bomba durante 5 segundos
@@ -185,9 +194,12 @@ void config_TIMER1(){
 
     // Habilitar interrupcion para Timer1
     NVIC_EnableIRQ(TIMER1_IRQn);
+    NVIC_SetPriority(TIMER0_IRQn, 3);
+    TIM_ClearIntPending(LPC_TIM1,TIM_MR1_INT); //Limpio bandera de interrupcion del timer0
+
 
 }
-
+/*
 //Configuro DMA para que transporte el promedio hasta UART
 void config_DMA(){
 
@@ -241,7 +253,7 @@ void visualizar_DMA_UART(){
     config_UART();
 }
 
-
+*/
 
 
 
@@ -278,14 +290,14 @@ void ADC_IRQHandler(){
         //sumo las muestras
         for(int i=0; i<muestras_size; i++){
             suma+=muestras[i];
-            muestras[i]=0; // voy limiando el buffer miestras extraigo las muestras
+            muestras[i]=0; // voy limpiando el buffer miestras extraigo las muestras
         }
         //tomo el promedio
         promedio = suma/muestras_size;
         suma = 0; // reseteo la suma
 
         
-        visualizar_DMA_UART(); //Se configuran DMA y UART para que se muestre la humedad por pantalla
+        //visualizar_DMA_UART(); //Se configuran DMA y UART para que se muestre la humedad por pantalla
 
 
         if(promedio <= 3138 && promedio >= 1701){
@@ -299,11 +311,13 @@ void ADC_IRQHandler(){
         }
 
         promedio = 0; //limpio la variable
+        ADC_GlobalGetStatus(LPC_ADC, 1);					// Limpia la bandera del ADC
         //flag abajo 
         return;
     }
 
-    //flag abajo
+    
+    ADC_GlobalGetStatus(LPC_ADC, 1);					// Limpia la bandera del ADC
     ADC_StartCmd(LPC_ADC, ADC_START_NOW); //comienza la conversion nuevamente
 }
 
