@@ -5,13 +5,15 @@
 #include "lpc17xx_pinsel.h"
 
 // PINES LEDs
-
+#define BOMBA  (1<<0)  // P0.0
 #define LED_AZUL  (1<<1)  // P0.1
 #define LED_VERDE  (1<<2)  // P0.2
 #define LED_NARANJA  (1<<3)  // P0.3
 
 // Umbral de HUMEDAD 
-#define UMBRAL_HUMEDAD 40 
+#define HUMEDAD_MAXIMA 3000
+#define UMBRAL_HUMEDAD 2373 
+#define HUMEDAD_MINIMA 1300
  
 volatile uint32_t adc_value = 0;
 
@@ -71,7 +73,7 @@ void config_timer1(void) {
     matchConfig.MatchChannel = 0;
     matchConfig.IntOnMatch = ENABLE;
     matchConfig.ResetOnMatch = ENABLE;
-    matchConfig.StopOnMatch = DISABLE;
+    matchConfig.StopOnMatch = ENABLE;
     matchConfig.ExtMatchOutputType = TIM_EXTMATCH_NOTHING;
     matchConfig.MatchValue = 5000000;  // 5 segundos
     
@@ -87,14 +89,14 @@ void config_timer1(void) {
 
 void config_leds(void) {
     // GPIO por defecto
-
+    //0.0 - Bomba
 	// P0.1 - led AZUL
     // P0.2 - led VERDE
 	// P0.3 - led NARANJA
     
 
-    GPIO_SetDir(0,  LED_AZUL | LED_VERDE | LED_NARANJA, 1);
-    GPIO_ClearValue(0, LED_AZUL | LED_VERDE | LED_NARANJA);
+    GPIO_SetDir(0,  BOMBA | LED_AZUL | LED_VERDE | LED_NARANJA, 1);
+    GPIO_ClearValue(0, BOMBA | LED_AZUL | LED_VERDE | LED_NARANJA);
 }
 
 void TIMER0_IRQHandler(void) {
@@ -106,17 +108,19 @@ void TIMER0_IRQHandler(void) {
 
         adc_value = ADC_ChannelGetData(LPC_ADC, ADC_CHANNEL_0);
         
-        if(adc_value <= 3138 && adc_value >= 1701){
+        if(adc_value <= UMBRAL_HUMEDAD && adc_value >= HUMEDAD_MINIMA){
             GPIO_SetValue(0, LED_VERDE); // Enciendo Led verde pin 0.2 (no necesita riego)
-            TIM_Cmd(LPC_TIM1, ENABLE); //Inicia el Timer1, cuenta 5segundos e interrumpe
-        }else if(adc_value > 3138 && adc_value <= 4096){
+            TIM_Cmd(LPC_TIM1, ENABLE); //Inicia el Timer1, cuenta 5 segundos e interrumpe
+        }else if(adc_value > UMBRAL_HUMEDAD && adc_value <= HUMEDAD_MAXIMA){
             GPIO_SetValue(0, LED_AZUL); //Enciendo Led azul pin 0.1 (prendo bomba)
+            GPIO_SetValue(0, BOMBA); //Enciendo pin 0.0 (prendo bomba)
             TIM_Cmd(LPC_TIM1, ENABLE); //Inicia el Timer1, cuenta 5segundos e interrumpe
         }else{
             GPIO_SetValue(0, LED_NARANJA); // Enciendo Led naranja pin 0.3 (no deberia pasar esta situacion)
+            TIM_Cmd(LPC_TIM1, ENABLE); //Inicia el Timer1, cuenta 5segundos e interrumpe
             //Mensaje de ERROR! en uart
         }
-
+        TIM_Cmd(LPC_TIM0, ENABLE); //inicia el timer
         TIM_ClearIntPending(LPC_TIM0,TIM_MR0_INT); //Limpio bandera de interrupcion del timer0
     }
 }
@@ -125,6 +129,8 @@ void TIMER1_IRQHandler(void) {
     if (TIM_GetIntStatus(LPC_TIM1, TIM_MR0_INT) == SET) {
         GPIO_ClearValue(0, LED_AZUL); //Apago Led azul pin 0.1
         GPIO_ClearValue(0, LED_VERDE); //Apago Led verde pin 0.2
+        GPIO_ClearValue(0, LED_NARANJA); //Apago Led naranja pin 0.3
+        GPIO_ClearValue(0, BOMBA); //Apago la bomba pin 0.
         TIM_ClearIntPending(LPC_TIM1,TIM_MR0_INT); //Limpio bandera de interrupcion del timer1
     }
 }
