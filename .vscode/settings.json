@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "ADC.C": "cpp"
+        "ADC.C": "cpp",
+        "lpc17xx_gpio.h": "c"
     }
 }

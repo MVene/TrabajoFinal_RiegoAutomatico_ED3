@@ -1,8 +1,16 @@
+//sistema de riego terminado
+//-------- HEADERS --------//
 #include "LPC17xx.h"
 #include "lpc17xx_adc.h"
 #include "lpc17xx_timer.h"
 #include "lpc17xx_gpio.h"
 #include "lpc17xx_pinsel.h"
+#include "lpc17xx_gpdma.h"
+#include "lpc17xx_UART.h"
+#include "string.h"
+#include "stdio.h"
+
+//-------- VARIABLES --------//
 
 // PINES LEDs
 #define BOMBA  (1<<0)  // P0.0
@@ -15,9 +23,13 @@
 #define UMBRAL_HUMEDAD 2373 
 #define HUMEDAD_MINIMA 1300
  
+// Buffer con el mensaje a enviar
+char mensaje[32] = " "; 
 volatile uint32_t adc_value = 0;
 
+//-------- FUNCIONES --------//
 
+//Configuracion ADC
 void init_adc(void) {
     // Configurar P0.23 como AD0.0
     PINSEL_CFG_Type pinsel_cfg;
@@ -87,17 +99,76 @@ void config_timer1(void) {
     NVIC_EnableIRQ(TIMER1_IRQn);    
 }
 
-void config_leds(void) {
+//Configuracion pines
+void config_pin(void) {
     // GPIO por defecto
-    //0.0 - Bomba
+    // 0.0 - Bomba
 	// P0.1 - led AZUL
     // P0.2 - led VERDE
 	// P0.3 - led NARANJA
     
-
     GPIO_SetDir(0,  BOMBA | LED_AZUL | LED_VERDE | LED_NARANJA, 1);
-    GPIO_ClearValue(0, BOMBA | LED_AZUL | LED_VERDE | LED_NARANJA);
+    GPIO_ClearValue(0, LED_AZUL | LED_VERDE | LED_NARANJA);
+    GPIO_SetValue(0, BOMBA);
 }
+
+
+// Configuración de UART
+void config_UART() {
+    //Configuracion para pin - Uart tx
+
+	PINSEL_CFG_Type PinCfg;
+	PinCfg.Funcnum = 1;
+	PinCfg.OpenDrain = 0;
+	PinCfg.Pinmode = PINSEL_PINMODE_TRISTATE;
+	PinCfg.Pinnum = 10;
+	PinCfg.Portnum = 0;
+	
+	PINSEL_ConfigPin(&PinCfg);
+
+    UART_CFG_Type UARTConfigStruct;
+    UART_ConfigStructInit(&UARTConfigStruct);
+    UART_Init(LPC_UART2, &UARTConfigStruct);
+
+    UART_FIFO_CFG_Type UARTFIFOConfigStruct;
+    UARTFIFOConfigStruct.FIFO_DMAMode = ENABLE; // Habilita el modo DMA
+    UARTFIFOConfigStruct.FIFO_Level = UART_FIFO_TRGLEV0;
+    UARTFIFOConfigStruct.FIFO_ResetRxBuf = ENABLE;
+    UARTFIFOConfigStruct.FIFO_ResetTxBuf = ENABLE;
+    UART_FIFOConfigStructInit(&UARTFIFOConfigStruct);
+
+    UART_FIFOConfig(LPC_UART2, &UARTFIFOConfigStruct);
+    UART_TxCmd(LPC_UART2, ENABLE);  // Habilita transmisión
+}
+
+// Configuración de DMA para enviar mensaje
+void config_DMA() {
+    
+    GPDMA_Init(); // Inicializa el controlador de DMA
+
+    // Configura el canal de DMA para transferir datos desde el buffer a UART
+    GPDMA_Channel_CFG_Type DMAUARTConfig;
+    DMAUARTConfig.ChannelNum = 0; // Canal 0 de DMA
+    DMAUARTConfig.SrcMemAddr = (uint32_t)mensaje; // Dirección de inicio del mensaje
+    DMAUARTConfig.DstMemAddr = 0; // Registro de transmisión de UART2
+    DMAUARTConfig.TransferSize = sizeof(mensaje); // Tamaño del mensaje
+    DMAUARTConfig.TransferWidth = 0; // Transfiere en bytes
+    DMAUARTConfig.TransferType = GPDMA_TRANSFERTYPE_M2P; // Transferencia de Memoria a Periférico
+    DMAUARTConfig.SrcConn = 0; // No se requiere conexión de fuente
+    DMAUARTConfig.DstConn = GPDMA_CONN_UART2_Tx; // Conexión de destino UART2 Tx
+    DMAUARTConfig.DMALLI = 0; // Sin enlace a otra transferencia
+
+    // Configura 
+    GPDMA_Setup(&DMAUARTConfig);
+    GPDMA_ChannelCmd(0, ENABLE); // Activa el canal DMA 0
+}
+
+void visualizar_DMA_UART(){
+    config_UART();
+    config_DMA();
+}
+
+//-------- HANDLERS --------//
 
 void TIMER0_IRQHandler(void) {
 
@@ -107,18 +178,24 @@ void TIMER0_IRQHandler(void) {
         while (!(ADC_ChannelGetStatus(LPC_ADC, ADC_CHANNEL_0, ADC_DATA_DONE)));
 
         adc_value = ADC_ChannelGetData(LPC_ADC, ADC_CHANNEL_0);
+
         
         if(adc_value <= UMBRAL_HUMEDAD && adc_value >= HUMEDAD_MINIMA){
             GPIO_SetValue(0, LED_VERDE); // Enciendo Led verde pin 0.2 (no necesita riego)
             TIM_Cmd(LPC_TIM1, ENABLE); //Inicia el Timer1, cuenta 5 segundos e interrumpe
+            strcpy(mensaje, "Humedad alta: NO necesita riego \n");
+            visualizar_DMA_UART();
         }else if(adc_value > UMBRAL_HUMEDAD && adc_value <= HUMEDAD_MAXIMA){
             GPIO_SetValue(0, LED_AZUL); //Enciendo Led azul pin 0.1 (prendo bomba)
-            GPIO_SetValue(0, BOMBA); //Enciendo pin 0.0 (prendo bomba)
+            GPIO_ClearValue(0, BOMBA); //Mando cero logico para encender pin 0.0 (prendo bomba)
             TIM_Cmd(LPC_TIM1, ENABLE); //Inicia el Timer1, cuenta 5segundos e interrumpe
+            strcpy(mensaje, "Humedad baja: iniciando riego \n");
+            visualizar_DMA_UART();
         }else{
             GPIO_SetValue(0, LED_NARANJA); // Enciendo Led naranja pin 0.3 (no deberia pasar esta situacion)
             TIM_Cmd(LPC_TIM1, ENABLE); //Inicia el Timer1, cuenta 5segundos e interrumpe
-            //Mensaje de ERROR! en uart
+            strcpy(mensaje, "¡Error! Valor fuera de limite \n");
+            visualizar_DMA_UART();
         }
         TIM_Cmd(LPC_TIM0, ENABLE); //inicia el timer
         TIM_ClearIntPending(LPC_TIM0,TIM_MR0_INT); //Limpio bandera de interrupcion del timer0
@@ -130,18 +207,21 @@ void TIMER1_IRQHandler(void) {
         GPIO_ClearValue(0, LED_AZUL); //Apago Led azul pin 0.1
         GPIO_ClearValue(0, LED_VERDE); //Apago Led verde pin 0.2
         GPIO_ClearValue(0, LED_NARANJA); //Apago Led naranja pin 0.3
-        GPIO_ClearValue(0, BOMBA); //Apago la bomba pin 0.
+        GPIO_SetValue(0, BOMBA); //Apago la bomba con cero en pin 0.
         TIM_ClearIntPending(LPC_TIM1,TIM_MR0_INT); //Limpio bandera de interrupcion del timer1
     }
 }
 
+//-------- PROGRAMA PRINCIPAL --------//
+
 int main(void) {
-    config_leds();
-    init_adc();
-    config_timer0();
-    config_timer1();
+    config_pin(); // Configura los pines
+    init_adc(); // Configura el ADC
+    config_timer0(); // Configura el timer0
+    config_timer1(); // Configura el timer1
     
-    while(1) {
+    // Bucle infinito
+    while(1) { 
     }
     return 0;
 }

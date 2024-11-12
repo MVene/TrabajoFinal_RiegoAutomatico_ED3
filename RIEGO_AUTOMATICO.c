@@ -199,7 +199,7 @@ void config_TIMER1(){
 
 
 }
-/*
+
 //Configuro DMA para que transporte el promedio hasta UART
 void config_DMA(){
 
@@ -253,7 +253,7 @@ void visualizar_DMA_UART(){
     config_UART();
 }
 
-*/
+
 
 
 
