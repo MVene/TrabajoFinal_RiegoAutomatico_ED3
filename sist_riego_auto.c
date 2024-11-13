@@ -1,4 +1,14 @@
-//sistema de riego terminado
+/*            	TRABAJO PRACTICO FINAL 
+ *               ELECTRONICA DIGITAL 3
+ *                        2024
+ * 	
+ * 		           "Sistema de Riego Automático"
+ *	-----------------------------------------------------
+ *	Integrantes:
+                - Guimpelevich María Luján
+                - Venecia Milagros Ailín
+ */
+
 //-------- HEADERS --------//
 #include "LPC17xx.h"
 #include "lpc17xx_adc.h"
@@ -31,6 +41,7 @@ volatile uint32_t adc_value = 0;
 
 //Configuracion ADC
 void init_adc(void) {
+
     // Configurar P0.23 como AD0.0
     PINSEL_CFG_Type pinsel_cfg;
     pinsel_cfg.Portnum = 0;
@@ -47,6 +58,7 @@ void init_adc(void) {
 
 // Configuracion del Timer0
 void config_timer0(void) {
+
     TIM_TIMERCFG_Type timerConfig;
     TIM_MATCHCFG_Type matchConfig;
     
@@ -60,7 +72,7 @@ void config_timer0(void) {
     matchConfig.ResetOnMatch = ENABLE;
     matchConfig.StopOnMatch = DISABLE;
     matchConfig.ExtMatchOutputType = TIM_EXTMATCH_NOTHING;
-    matchConfig.MatchValue = 120000000;  // 2 minutos
+    matchConfig.MatchValue = 20000000;  // 20 segundos
     
     TIM_ConfigMatch(LPC_TIM0, &matchConfig);
     
@@ -74,6 +86,7 @@ void config_timer0(void) {
    
 // Configuracion del timer1
 void config_timer1(void) {
+
     TIM_TIMERCFG_Type timerConfig;
     TIM_MATCHCFG_Type matchConfig;
     
@@ -101,6 +114,7 @@ void config_timer1(void) {
 
 //Configuracion pines
 void config_pin(void) {
+
     // GPIO por defecto
     // 0.0 - Bomba
 	// P0.1 - led AZUL
@@ -115,8 +129,8 @@ void config_pin(void) {
 
 // Configuración de UART
 void config_UART() {
-    //Configuracion para pin - Uart tx
 
+    //Configuracion para pin - Uart tx
 	PINSEL_CFG_Type PinCfg;
 	PinCfg.Funcnum = 1;
 	PinCfg.OpenDrain = 0;
@@ -164,6 +178,7 @@ void config_DMA() {
 }
 
 void visualizar_DMA_UART(){
+
     config_UART();
     config_DMA();
 }
@@ -175,46 +190,57 @@ void TIMER0_IRQHandler(void) {
     if (TIM_GetIntStatus(LPC_TIM0, TIM_MR0_INT) == SET) {
 
         ADC_StartCmd(LPC_ADC, ADC_START_NOW);
+
         while (!(ADC_ChannelGetStatus(LPC_ADC, ADC_CHANNEL_0, ADC_DATA_DONE)));
 
         adc_value = ADC_ChannelGetData(LPC_ADC, ADC_CHANNEL_0);
-
         
         if(adc_value <= UMBRAL_HUMEDAD && adc_value >= HUMEDAD_MINIMA){
+
             GPIO_SetValue(0, LED_VERDE); // Enciendo Led verde pin 0.2 (no necesita riego)
             TIM_Cmd(LPC_TIM1, ENABLE); //Inicia el Timer1, cuenta 5 segundos e interrumpe
             strcpy(mensaje, "Humedad alta: NO necesita riego \n");
             visualizar_DMA_UART();
+
         }else if(adc_value > UMBRAL_HUMEDAD && adc_value <= HUMEDAD_MAXIMA){
+
             GPIO_SetValue(0, LED_AZUL); //Enciendo Led azul pin 0.1 (prendo bomba)
             GPIO_ClearValue(0, BOMBA); //Mando cero logico para encender pin 0.0 (prendo bomba)
             TIM_Cmd(LPC_TIM1, ENABLE); //Inicia el Timer1, cuenta 5segundos e interrumpe
             strcpy(mensaje, "Humedad baja: iniciando riego \n");
             visualizar_DMA_UART();
+
         }else{
+
             GPIO_SetValue(0, LED_NARANJA); // Enciendo Led naranja pin 0.3 (no deberia pasar esta situacion)
             TIM_Cmd(LPC_TIM1, ENABLE); //Inicia el Timer1, cuenta 5segundos e interrumpe
             strcpy(mensaje, "¡Error! Valor fuera de limite \n");
             visualizar_DMA_UART();
+
         }
+
         TIM_Cmd(LPC_TIM0, ENABLE); //inicia el timer
         TIM_ClearIntPending(LPC_TIM0,TIM_MR0_INT); //Limpio bandera de interrupcion del timer0
     }
 }
 
 void TIMER1_IRQHandler(void) {
+
     if (TIM_GetIntStatus(LPC_TIM1, TIM_MR0_INT) == SET) {
+
         GPIO_ClearValue(0, LED_AZUL); //Apago Led azul pin 0.1
         GPIO_ClearValue(0, LED_VERDE); //Apago Led verde pin 0.2
         GPIO_ClearValue(0, LED_NARANJA); //Apago Led naranja pin 0.3
         GPIO_SetValue(0, BOMBA); //Apago la bomba con cero en pin 0.
         TIM_ClearIntPending(LPC_TIM1,TIM_MR0_INT); //Limpio bandera de interrupcion del timer1
+
     }
 }
 
 //-------- PROGRAMA PRINCIPAL --------//
 
 int main(void) {
+
     config_pin(); // Configura los pines
     init_adc(); // Configura el ADC
     config_timer0(); // Configura el timer0
@@ -223,5 +249,6 @@ int main(void) {
     // Bucle infinito
     while(1) { 
     }
+
     return 0;
 }
