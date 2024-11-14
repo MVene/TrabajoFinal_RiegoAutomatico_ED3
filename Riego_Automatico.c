@@ -2,7 +2,7 @@
  *               ELECTRONICA DIGITAL 3
  *                        2024
  * 	
- * 		           "Sistema de Riego Automático"
+ * 		      "Sistema de Riego Automático"
  *	-----------------------------------------------------
  *	Integrantes:
                 - Guimpelevich María Luján
@@ -10,6 +10,7 @@
  */
 
 //-------- HEADERS --------//
+
 #include "LPC17xx.h"
 #include "lpc17xx_adc.h"
 #include "lpc17xx_timer.h"
@@ -23,17 +24,24 @@
 //-------- VARIABLES --------//
 
 // PINES LEDs
+
 #define BOMBA  (1<<0)  // P0.0
 #define LED_AZUL  (1<<1)  // P0.1
 #define LED_VERDE  (1<<2)  // P0.2
 #define LED_NARANJA  (1<<3)  // P0.3
 
 // Umbral de HUMEDAD 
+<<<<<<< HEAD:sist_riego_auto.c
 #define HUMEDAD_MINIMA 3000
+=======
+
+#define HUMEDAD_MAXIMA 3000
+>>>>>>> d5172216252f77ace29a5858faa3fee180e08225:Riego_Automatico.c
 #define UMBRAL_HUMEDAD 2373 
 #define HUMEDAD_MAXIMA 1300
  
 // Buffer con el mensaje a enviar
+
 char mensaje[32] = " "; 
 volatile uint32_t adc_value = 0;
 
@@ -177,6 +185,7 @@ void config_DMA() {
     GPDMA_ChannelCmd(0, ENABLE); // Activa el canal DMA 0
 }
 
+// Visualiza el mensaje en la UART
 void visualizar_DMA_UART(){
 
     config_UART();
