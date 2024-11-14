@@ -29,9 +29,9 @@
 #define LED_NARANJA  (1<<3)  // P0.3
 
 // Umbral de HUMEDAD 
-#define HUMEDAD_MAXIMA 3000
+#define HUMEDAD_MINIMA 3000
 #define UMBRAL_HUMEDAD 2373 
-#define HUMEDAD_MINIMA 1300
+#define HUMEDAD_MAXIMA 1300
  
 // Buffer con el mensaje a enviar
 char mensaje[32] = " "; 
@@ -195,14 +195,14 @@ void TIMER0_IRQHandler(void) {
 
         adc_value = ADC_ChannelGetData(LPC_ADC, ADC_CHANNEL_0);
         
-        if(adc_value <= UMBRAL_HUMEDAD && adc_value >= HUMEDAD_MINIMA){
+        if(adc_value <= UMBRAL_HUMEDAD && adc_value >= HUMEDAD_MAXIMA){
 
             GPIO_SetValue(0, LED_VERDE); // Enciendo Led verde pin 0.2 (no necesita riego)
             TIM_Cmd(LPC_TIM1, ENABLE); //Inicia el Timer1, cuenta 5 segundos e interrumpe
             strcpy(mensaje, "Humedad alta: NO necesita riego \n");
             visualizar_DMA_UART();
 
-        }else if(adc_value > UMBRAL_HUMEDAD && adc_value <= HUMEDAD_MAXIMA){
+        }else if(adc_value > UMBRAL_HUMEDAD && adc_value <= HUMEDAD_MINIMA){
 
             GPIO_SetValue(0, LED_AZUL); //Enciendo Led azul pin 0.1 (prendo bomba)
             GPIO_ClearValue(0, BOMBA); //Mando cero logico para encender pin 0.0 (prendo bomba)
