@@ -19,6 +19,7 @@
 #include "lpc17xx_UART.h"
 #include "string.h"
 #include "stdio.h"
+#include "lpc17xx_dac.h"
 
 //-------- VARIABLES --------//
 
@@ -27,6 +28,7 @@
 #define LED_AZUL  (1<<1)  // P0.1
 #define LED_VERDE  (1<<2)  // P0.2
 #define LED_NARANJA  (1<<3)  // P0.3
+#define BUZZER  (1<<26)  // P0.26
 
 // Umbral de HUMEDAD 
 #define HUMEDAD_MAXIMA 3000
@@ -38,6 +40,7 @@ char mensaje[32] = " ";
 volatile uint32_t adc_value = 0;
 
 //-------- FUNCIONES --------//
+void conversion_DAC(uint32_t);
 
 //Configuracion ADC
 void init_adc(void) {
@@ -121,8 +124,8 @@ void config_pin(void) {
     // P0.2 - led VERDE
 	// P0.3 - led NARANJA
     
-    GPIO_SetDir(0,  BOMBA | LED_AZUL | LED_VERDE | LED_NARANJA, 1);
-    GPIO_ClearValue(0, LED_AZUL | LED_VERDE | LED_NARANJA);
+    GPIO_SetDir(0,  BOMBA | LED_AZUL | LED_VERDE | LED_NARANJA| BUZZER , 1);
+    GPIO_ClearValue(0, LED_AZUL | LED_VERDE | LED_NARANJA | BUZZER);
     GPIO_SetValue(0, BOMBA);
 }
 
@@ -183,6 +186,26 @@ void visualizar_DMA_UART(){
     config_DMA();
 }
 
+void config_DAC(){	
+    //conguración del pin 0.26 como DAC
+    PINSEL_CFG_Type pinsel_cfg;
+    pinsel_cfg.Portnum = 0;
+    pinsel_cfg.Pinnum = 26;
+    pinsel_cfg.Funcnum = 2;
+    pinsel_cfg.Pinmode = PINSEL_PINMODE_PULLUP; 
+    PINSEL_ConfigPin(&pinsel_cfg);
+
+	LPC_DAC->DACCTRL = 0x0000; //Limpia toda config que haya en el DAC
+    LPC_SC->PCONP |= (1 << 15); // Habilitar el bloque DAC
+	DAC_CONVERTER_CFG_Type dac_cfg;
+	dac_cfg.DBLBUF_ENA	   =   	  0;
+	dac_cfg.CNT_ENA        =      0;
+	dac_cfg.DMA_ENA        =      0;
+	DAC_Init(LPC_DAC);
+	DAC_ConfigDAConverterControl(LPC_DAC, &dac_cfg);
+	DAC_SetBias(LPC_DAC,0);
+
+}
 //-------- HANDLERS --------//
 
 void TIMER0_IRQHandler(void) {
@@ -194,6 +217,8 @@ void TIMER0_IRQHandler(void) {
         while (!(ADC_ChannelGetStatus(LPC_ADC, ADC_CHANNEL_0, ADC_DATA_DONE)));
 
         adc_value = ADC_ChannelGetData(LPC_ADC, ADC_CHANNEL_0);
+        
+        conversion_DAC(adc_value);
         
         if(adc_value <= UMBRAL_HUMEDAD && adc_value >= HUMEDAD_MINIMA){
 
@@ -237,12 +262,34 @@ void TIMER1_IRQHandler(void) {
     }
 }
 
+
+// Envia un valor por el DAC
+void enviarValorDAC(uint32_t valorDAC) {
+    if (valorDAC == 0) return;  // Verifica que el valor a enviar sea distinto de cero
+    // Envia el valor al DAC
+    DAC_UpdateValue(LPC_DAC, valorDAC);
+}
+
+//Toma el valor medido de humedad y busca su valor de salida correspondiente
+void conversion_DAC(uint32_t value_adc){
+
+	if(adc_value > UMBRAL_HUMEDAD && adc_value <= HUMEDAD_MAXIMA){
+		//Humedad baja -> necesita riego 
+		enviarValorDAC(605); 
+		
+	}	else{
+		enviarValorDAC(1024); //como dac no cuenta este valor, lo cuenta como 0
+	}
+
+}
+
 //-------- PROGRAMA PRINCIPAL --------//
 
 int main(void) {
 
     config_pin(); // Configura los pines
     init_adc(); // Configura el ADC
+    config_DAC(); //configura el DAC
     config_timer0(); // Configura el timer0
     config_timer1(); // Configura el timer1
     
