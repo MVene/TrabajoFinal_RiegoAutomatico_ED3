@@ -1,6 +1,6 @@
 # Proyecto Final - Sistema de Riego Automático
 
-Este proyecto final fue desarrollado en la placa **LPC1769** y consiste en un sistema de riego automático que utiliza un **sensor capacitivo** para medir la humedad del suelo. La señal del sensor es procesada mediante un **conversor analógico-digital (ADC)**, y el sistema toma decisiones basadas en los valores obtenidos para activar o desactivar el riego de una planta.
+Este proyecto final fue desarrollado en la placa **LPC1769** y consiste en un sistema de riego automático que utiliza un **sensor capacitivo** para medir la humedad del suelo. La señal del sensor es procesada mediante un **conversor analógico-digital (ADC)**, y el sistema toma decisiones basadas en los valores obtenidos para activar o desactivar el riego de una planta, ademas utilizamos DAC para señalizar mediante un tono cuando se esta regando la planta.
 
 ## Tabla de Contenidos
 1. [Componentes del Sistema](#componentes-del-sistema)
