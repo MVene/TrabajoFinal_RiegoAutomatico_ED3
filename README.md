@@ -13,7 +13,7 @@ Este proyecto final fue desarrollado en la placa **LPC1769** y consiste en un si
 
 - **LPC1769**: Microcontrolador encargado del control general del sistema.
 - **Sensor capacitivo de humedad**: Detecta la humedad en el suelo y envía una señal analógica al ADC.
-- **Bomba de agua**: Actúa como el sistema de riego, controlado por el microcontrolador (por mientras led azul).
+- **Bomba de agua**: Actúa como el sistema de riego, controlado por el microcontrolador.
 - **Modulo UART**: Este comunicador serie nos permite observar el estado del sistema en la pc.
 - **DAC y Buzzer**: Utilizamos el DAC para activar un buzzer que emite un sonido mientras la bomba de agua está en funcionamiento, proporcionando una indicación auditiva de que el riego está activo.
 - **Led Azul**: Nos permite saber cuando la bomba se tiene que prender.
