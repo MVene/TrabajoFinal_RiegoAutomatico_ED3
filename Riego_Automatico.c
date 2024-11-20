@@ -196,8 +196,7 @@ void config_DAC(){
     PINSEL_ConfigPin(&pinsel_cfg);
 
 	LPC_DAC->DACCTRL = 0x0000; //Limpia toda config que haya en el DAC
-    LPC_SC->PCONP |= (1 << 15); // Habilitar el bloque DAC
-	DAC_CONVERTER_CFG_Type dac_cfg;
+    DAC_CONVERTER_CFG_Type dac_cfg;
 	dac_cfg.DBLBUF_ENA	   =   	  0;
 	dac_cfg.CNT_ENA        =      0;
 	dac_cfg.DMA_ENA        =      0;
@@ -257,6 +256,7 @@ void TIMER1_IRQHandler(void) {
         GPIO_ClearValue(0, LED_VERDE); //Apago Led verde pin 0.2
         GPIO_ClearValue(0, LED_NARANJA); //Apago Led naranja pin 0.3
         GPIO_SetValue(0, BOMBA); //Apago la bomba con cero en pin 0.
+        enviarValorDAC(1024); 
         TIM_ClearIntPending(LPC_TIM1,TIM_MR0_INT); //Limpio bandera de interrupcion del timer1
 
     }
